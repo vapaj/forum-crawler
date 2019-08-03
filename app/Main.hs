@@ -29,8 +29,7 @@ printTopics pageNum keyword pageLimit
       initReq <- HTTP.parseRequest $ url pageNum
       wat <- HTTP.httpBS initReq
       let res = decodeUtf8 $ HTTP.getResponseBody wat
-          color :: String = "\x1b[32m"
-      putStrLn $ color ++ (T.unpack $ T.intercalate "\n" $ filterByKeyword keyword $ findTopics [] $ TS.parseTags res)
+      putStrLn $ (T.unpack $ T.intercalate "\n" $ filterByKeyword keyword $ findTopics [] $ TS.parseTags res)
       printTopics (pageNum + 1) keyword pageLimit
 
 findTopics :: [T.Text] -> [TS.Tag T.Text] -> [T.Text]
