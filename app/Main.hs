@@ -18,7 +18,7 @@ main = do
   args <- getArgs
   let keyword = args !! 0
       pages   = args !! 1
-  printTopics 1 keyword (read pages :: Int)
+  printTopics 1 keyword $ read pages
 
 printTopics :: Int -> String -> Int -> IO ()
 printTopics pageNum keyword pageLimit
@@ -27,9 +27,9 @@ printTopics pageNum keyword pageLimit
       let url 1 = "https://www.digicamera.net/keskus/viewforum.php?f=10"
           url n = "https://www.digicamera.net/keskus/viewforum.php?f=10&start=" <> (show $ n * 25)
       initReq <- HTTP.parseRequest $ url pageNum
-      wat <- HTTP.httpBS initReq
-      let res = decodeUtf8 $ HTTP.getResponseBody wat
-      putStrLn $ (T.unpack $ T.intercalate "\n" $ filterByKeyword keyword $ findTopics [] $ TS.parseTags res)
+      r <- HTTP.httpBS initReq
+      let res = decodeUtf8 $ HTTP.getResponseBody r
+      putStrLn $ (T.unpack $ T.intercalate "\n" $ highlightMatches keyword $ filterByKeyword keyword $ findTopics [] $ TS.parseTags res)
       printTopics (pageNum + 1) keyword pageLimit
 
 findTopics :: [T.Text] -> [TS.Tag T.Text] -> [T.Text]
@@ -41,3 +41,9 @@ findTopics topics (_:rest) = findTopics topics rest
 filterByKeyword :: String -> [T.Text] -> [T.Text]
 filterByKeyword keyword topics =
   filter (isInfixOf keyword . T.unpack) topics
+
+highlightMatches :: String -> [T.Text] -> [T.Text]
+highlightMatches keyword matches =
+  let keywordText = T.pack keyword
+      highlightedKeyword = T.pack $ "\x1b[32m" ++ keyword ++ "\x1b[0m"
+  in map (\t -> T.replace keywordText highlightedKeyword t) matches
