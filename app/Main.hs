@@ -45,5 +45,5 @@ filterByKeyword keyword topics =
 highlightMatches :: String -> [T.Text] -> [T.Text]
 highlightMatches keyword matches =
   let keywordText = T.pack keyword
-      highlightedKeyword = T.pack $ "\x1b[32m" ++ keyword ++ "\x1b[0m"
+      highlightedKeyword = "\x1b[32m" <> keywordText <> "\x1b[0m"
   in map (\t -> T.replace keywordText highlightedKeyword t) matches
