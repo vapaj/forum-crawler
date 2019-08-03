@@ -37,8 +37,8 @@ executables:
     - forum-crawler
     - bytestring
     - tagsoup
-    - xml-conduit
     - text
+    - safe
 tests:
   forum-crawler-test:
     main:                Spec.hs
