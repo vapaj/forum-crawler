@@ -4,25 +4,35 @@
 {-# LANGUAGE ViewPatterns        #-}
 module Main where
 
-import           Control.Monad        (replicateM_)
+import           Control.Monad        (when)
 import qualified Data.ByteString.Lazy as B
+import           Data.Foldable        (for_)
 import           Data.List            (filter, isInfixOf)
+import           Data.Maybe
 import qualified Data.Text            as T
 import           Data.Text.Encoding   (decodeUtf8)
 import qualified Network.HTTP.Simple  as HTTP
+import           Safe                 (initMay, lastMay, readMay)
 import           System.Environment
+import           System.Exit
 import           Text.HTML.TagSoup    ((~==))
 import qualified Text.HTML.TagSoup    as TS
 
 main :: IO ()
 main = do
   args <- getArgs
-  let keyword = args !! 0
-      pages   = args !! 1
-  printTopics 1 keyword $ read pages
+  let maybeKeywords   = Safe.initMay args
+      maybeNumOfPages = Safe.lastMay args
+  case (maybeKeywords, maybeNumOfPages) of
+    (Nothing, _)                -> putStrLn "No keywords given" <* exitFailure
+    (Just [], _)                -> putStrLn "No keywords given" <* exitFailure
+    (_, Nothing)                -> putStrLn "No amount of pages given" <* exitFailure
+    (Just keywords, Just p)
+      | Just (pages :: Int) <- readMay p -> printTopics 1 keywords pages
+      | otherwise -> putStrLn "No amount of pages given" <* exitFailure
 
-printTopics :: Int -> String -> Int -> IO ()
-printTopics pageNum keyword pageLimit
+printTopics :: Int -> [String] -> Int -> IO ()
+printTopics pageNum keywords pageLimit
   | pageNum > pageLimit = pure ()
   | otherwise = do
       let url 1 = "https://www.digicamera.net/keskus/viewforum.php?f=10"
@@ -30,8 +40,9 @@ printTopics pageNum keyword pageLimit
       initReq <- HTTP.parseRequest $ url pageNum
       r <- HTTP.httpBS initReq
       let res = decodeUtf8 $ HTTP.getResponseBody r
-      putStrLn $ (T.unpack $ T.intercalate "\n" $ highlightMatches keyword $ filterByKeyword keyword $ findTopics [] $ TS.parseTags res)
-      printTopics (pageNum + 1) keyword pageLimit
+      for_ keywords $ \keyword ->
+        putStrLn $ (T.unpack $ T.intercalate "\n" $ highlightMatches keyword $ filterByKeyword keyword $ findTopics [] $ TS.parseTags res)
+      printTopics (pageNum + 1) keywords pageLimit
 
 findTopics :: [T.Text] -> [TS.Tag T.Text] -> [T.Text]
 findTopics topics [] = topics
