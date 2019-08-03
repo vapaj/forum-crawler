@@ -1,6 +1,7 @@
 {-# LANGUAGE BlockArguments      #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns        #-}
 module Main where
 
 import           Control.Monad        (replicateM_)
@@ -43,7 +44,6 @@ filterByKeyword keyword topics =
   filter (isInfixOf keyword . T.unpack) topics
 
 highlightMatches :: String -> [T.Text] -> [T.Text]
-highlightMatches keyword matches =
-  let keywordText = T.pack keyword
-      highlightedKeyword = "\x1b[32m" <> keywordText <> "\x1b[0m"
-  in map (\t -> T.replace keywordText highlightedKeyword t) matches
+highlightMatches (T.pack -> keyword) matches =
+  let highlightedKeyword = "\x1b[32m" <> keyword <> "\x1b[0m"
+  in map (\t -> T.replace keyword highlightedKeyword t) matches
