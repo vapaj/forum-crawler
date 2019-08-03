@@ -1,3 +1,4 @@
 .stack-work/
 forum-crawler.cabal
+.DS_Store
 *~
