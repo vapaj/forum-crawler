@@ -6,6 +6,7 @@ module Main where
 
 import           Control.Monad        (when)
 import qualified Data.ByteString.Lazy as B
+import           Data.Char            (toLower)
 import           Data.Foldable        (for_)
 import           Data.List            (filter, isInfixOf)
 import           Data.Maybe
@@ -24,9 +25,8 @@ main = do
   let maybeKeywords   = Safe.initMay args
       maybeNumOfPages = Safe.lastMay args
   case (maybeKeywords, maybeNumOfPages) of
-    (Nothing, _)                -> putStrLn "No keywords given" <* exitFailure
-    (Just [], _)                -> putStrLn "No keywords given" <* exitFailure
-    (_, Nothing)                -> putStrLn "No amount of pages given" <* exitFailure
+    (Nothing, _) -> putStrLn "No keywords given" <* exitFailure
+    (Just [], _) -> putStrLn "No keywords given" <* exitFailure
     (Just keywords, Just p)
       | Just (pages :: Int) <- readMay p -> printTopics 1 keywords pages
       | otherwise -> putStrLn "No amount of pages given" <* exitFailure
@@ -41,20 +41,34 @@ printTopics pageNum keywords pageLimit
       r <- HTTP.httpBS initReq
       let res = decodeUtf8 $ HTTP.getResponseBody r
       for_ keywords $ \keyword ->
-        putStrLn $ (T.unpack $ T.intercalate "\n" $ highlightMatches keyword $ filterByKeyword keyword $ findTopics [] $ TS.parseTags res)
+        putStrLn $ T.unpack $ T.intercalate "\n"
+        $ highlightMatches keyword
+        $ filterByKeyword keyword
+        $ findTopics [] $ TS.parseTags res
       printTopics (pageNum + 1) keywords pageLimit
 
 findTopics :: [T.Text] -> [TS.Tag T.Text] -> [T.Text]
 findTopics topics [] = topics
-findTopics topics (TS.TagOpen ("a" :: T.Text) [("href", url), ("class", "topictitle")] : (TS.TagText topic) : rest) =
+findTopics topics (TS.TagOpen ("a" :: T.Text) [("href", _url), ("class", "topictitle")] : (TS.TagText topic) : rest) =
   findTopics (topics <> [topic]) rest
 findTopics topics (_:rest) = findTopics topics rest
 
 filterByKeyword :: String -> [T.Text] -> [T.Text]
-filterByKeyword keyword topics =
-  filter (isInfixOf keyword . T.unpack) topics
+filterByKeyword (map toLower -> keyword) topics =
+  filter (isInfixOf keyword . T.unpack . T.toLower) topics
 
 highlightMatches :: String -> [T.Text] -> [T.Text]
-highlightMatches (T.pack -> keyword) matches =
-  let highlightedKeyword = "\x1b[32m" <> keyword <> "\x1b[0m"
-  in map (\t -> T.replace keyword highlightedKeyword t) matches
+highlightMatches keyword matches =
+ map (T.pack . highlightMatchingWord keyword "" . T.unpack) matches
+
+highlightMatchingWord :: String -> String -> String -> String
+highlightMatchingWord _ final "" = final
+highlightMatchingWord keyword final matchingSentence =
+  let l = length keyword
+      (word@(w : ord), rest) = splitAt l matchingSentence
+  in if doesMatchCaseInsensitive keyword word
+       then highlightMatchingWord keyword (final ++ "\x1b[32m" ++ word ++ "\x1b[0m") rest
+       else highlightMatchingWord keyword (final ++ [w]) (ord ++ rest)
+
+doesMatchCaseInsensitive :: String -> String -> Bool
+doesMatchCaseInsensitive keyword matchCandidate = map toLower keyword == map toLower matchCandidate
