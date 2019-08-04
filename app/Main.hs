@@ -1,4 +1,5 @@
 {-# LANGUAGE BlockArguments      #-}
+{-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
 module Main where
@@ -6,7 +7,9 @@ module Main where
 import qualified Data.ByteString.UTF8 as B
 import           Data.Char            (toLower)
 import           Data.Foldable        (for_)
-import           Data.List            (filter, intercalate, isInfixOf)
+import           Data.List            (filter, intercalate, isInfixOf, length,
+                                       maximumBy, zip)
+import           Data.Ord
 import qualified Network.HTTP.Simple  as HTTP
 import           Safe                 (initMay, lastMay, readMay)
 import           System.Environment
@@ -37,22 +40,34 @@ printTopics pageNum keywords pageLimit
       let res                = B.toString $ HTTP.getResponseBody r
           topics             = findTopics [] $ TS.parseTags res
           matches            = concatMap (filterByKeyword topics) keywords
-          highlightedMatches = highlightAllMatches keywords matches
-      putStrLn $ intercalate "\n" highlightedMatches
+          highlightedMatches = highlightAllMatches keywords $ map topicTitle matches
+          matchesWithUrls = map (topicToString . uncurry Topic) $ zip highlightedMatches $ map topicUrl matches
+      putStrLn $ intercalate "\n" matchesWithUrls
       printTopics (pageNum + 1) keywords pageLimit
 
-findTopics :: [String] -> [TS.Tag String] -> [String]
+threadUrlBase :: String
+threadUrlBase = "https://www.digicamera.net/keskus"
+
+data Topic = Topic
+  { topicTitle :: String
+  , topicUrl   :: String
+  }
+
+topicToString :: Topic -> String
+topicToString Topic{topicTitle, topicUrl} = topicTitle ++ " -> " ++ topicUrl
+
+findTopics :: [Topic] -> [TS.Tag String] -> [Topic]
 findTopics topics [] = topics
-findTopics topics (TS.TagOpen "a" [("href", _url), ("class", "topictitle")] : (TS.TagText topic) : rest) =
-  findTopics (topics <> [topic]) rest
+findTopics topics (TS.TagOpen "a" [("href", ('.' : url)), ("class", "topictitle")] : (TS.TagText topic) : rest) =
+  findTopics (topics <> [Topic topic $ threadUrlBase ++ url]) rest
 findTopics topics (_:rest) = findTopics topics rest
 
-filterByKeyword :: [String] -> String -> [String]
+filterByKeyword :: [Topic] -> String -> [Topic]
 filterByKeyword topics (map toLower -> keyword) =
-  filter (isInfixOf keyword . map toLower) topics
+  filter (isInfixOf keyword . map toLower . topicTitle) topics
 
 highlightAllMatches :: [String] -> [String] -> [String]
-highlightAllMatches [] matches = matches
+highlightAllMatches [] highlightedMatches = highlightedMatches
 highlightAllMatches (keyword : rest) matches =
   highlightAllMatches rest $ highlightMatches keyword matches
 
