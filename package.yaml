@@ -27,6 +27,7 @@ executables:
     - tagsoup
     - text
     - safe
+    - utf8-string
 tests:
   forum-crawler-test:
     main:                Spec.hs
