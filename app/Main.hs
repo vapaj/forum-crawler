@@ -34,12 +34,11 @@ printTopics pageNum keywords pageLimit
           url n = "https://www.digicamera.net/keskus/viewforum.php?f=10&start=" <> (show $ n * 25)
       initReq <- HTTP.parseRequest $ url pageNum
       r <- HTTP.httpBS initReq
-      let res = B.toString $ HTTP.getResponseBody r
-      for_ keywords $ \keyword ->
-        putStrLn $ intercalate "\n"
-        $ highlightMatches keyword
-        $ filterByKeyword keyword
-        $ findTopics [] $ TS.parseTags res
+      let res                = B.toString $ HTTP.getResponseBody r
+          topics             = findTopics [] $ TS.parseTags res
+          matches            = concatMap (filterByKeyword topics) keywords
+          highlightedMatches = highlightAllMatches keywords matches
+      putStrLn $ intercalate "\n" highlightedMatches
       printTopics (pageNum + 1) keywords pageLimit
 
 findTopics :: [String] -> [TS.Tag String] -> [String]
@@ -48,9 +47,14 @@ findTopics topics (TS.TagOpen "a" [("href", _url), ("class", "topictitle")] : (T
   findTopics (topics <> [topic]) rest
 findTopics topics (_:rest) = findTopics topics rest
 
-filterByKeyword :: String -> [String] -> [String]
-filterByKeyword (map toLower -> keyword) topics =
+filterByKeyword :: [String] -> String -> [String]
+filterByKeyword topics (map toLower -> keyword) =
   filter (isInfixOf keyword . map toLower) topics
+
+highlightAllMatches :: [String] -> [String] -> [String]
+highlightAllMatches [] matches = matches
+highlightAllMatches (keyword : rest) matches =
+  highlightAllMatches rest $ highlightMatches keyword matches
 
 highlightMatches :: String -> [String] -> [String]
 highlightMatches keyword matches =
