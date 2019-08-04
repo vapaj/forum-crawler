@@ -41,7 +41,7 @@ printTopics pageNum keywords pageLimit
           topics             = findTopics [] $ TS.parseTags res
           matches            = concatMap (filterByKeyword topics) keywords
           highlightedMatches = highlightAllMatches keywords $ map topicTitle matches
-          matchesWithUrls = map (topicToString . uncurry Topic) $ zip highlightedMatches $ map topicUrl matches
+          matchesWithUrls    = map (topicToString . uncurry Topic) $ zip highlightedMatches $ map topicUrl matches
       putStrLn $ intercalate "\n" matchesWithUrls
       printTopics (pageNum + 1) keywords pageLimit
 
@@ -54,13 +54,23 @@ data Topic = Topic
   }
 
 topicToString :: Topic -> String
-topicToString Topic{topicTitle, topicUrl} = topicTitle ++ " -> " ++ topicUrl
+topicToString Topic{topicTitle, topicUrl} = topicTitle ++ cyan " * " ++ topicUrl
+
+green :: String -> String
+green word = "\x1b[32m" ++ word ++ "\x1b[0m"
+
+cyan :: String -> String
+cyan word = "\x1b[36m" ++ word ++ "\x1b[0m"
 
 findTopics :: [Topic] -> [TS.Tag String] -> [Topic]
 findTopics topics [] = topics
-findTopics topics (TS.TagOpen "a" [("href", ('.' : url)), ("class", "topictitle")] : (TS.TagText topic) : rest) =
-  findTopics (topics <> [Topic topic $ threadUrlBase ++ url]) rest
+findTopics topics (TS.TagOpen "a" [("href", url), ("class", "topictitle")] : (TS.TagText topic) : rest) =
+  findTopics (topics <> [Topic topic $ createThreadUrl url]) rest
 findTopics topics (_:rest) = findTopics topics rest
+
+createThreadUrl :: String -> String
+createThreadUrl ('.' : url) = createThreadUrl url
+createThreadUrl url         = threadUrlBase ++ url
 
 filterByKeyword :: [Topic] -> String -> [Topic]
 filterByKeyword topics (map toLower -> keyword) =
@@ -81,7 +91,7 @@ highlightMatchingWord keyword final matchingSentence =
   let l = length keyword
       (word@(w : ord), rest) = splitAt l matchingSentence
   in if doesMatchCaseInsensitive keyword word
-       then highlightMatchingWord keyword (final ++ "\x1b[32m" ++ word ++ "\x1b[0m") rest
+       then highlightMatchingWord keyword (final ++ green word) rest
        else highlightMatchingWord keyword (final ++ [w]) (ord ++ rest)
 
 doesMatchCaseInsensitive :: String -> String -> Bool
